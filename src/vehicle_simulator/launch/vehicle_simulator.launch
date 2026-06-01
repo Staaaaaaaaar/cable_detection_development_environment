@@ -2,15 +2,63 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, TimerAction
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.actions import (
+  DeclareLaunchArgument,
+  ExecuteProcess,
+  OpaqueFunction,
+  TimerAction,
+)
 from launch_ros.actions import Node
 from launch.substitutions import Command, LaunchConfiguration
 
-def declare_world_action(context, world_name):
+
+def setup_gazebo(context, *args, **kwargs):
+  world_name = LaunchConfiguration('world_name')
+  gui = LaunchConfiguration('gui')
+  verbose = LaunchConfiguration('verbose')
+
   world_name_str = str(world_name.perform(context))
-  declare_world = DeclareLaunchArgument('world', default_value=[os.path.join(get_package_share_directory('vehicle_simulator'), 'world', world_name_str + '.world')], description='')
-  return [declare_world]
+  gui_str = str(gui.perform(context))
+  verbose_str = str(verbose.perform(context))
+
+  pkg_share = get_package_share_directory('vehicle_simulator')
+  world_path = os.path.join(pkg_share, 'world', world_name_str + '.world')
+  mesh_path = os.path.join(pkg_share, 'mesh')
+  resource_path = os.path.join(pkg_share, 'world')
+
+  gazebo_model_path = mesh_path
+  if 'GAZEBO_MODEL_PATH' in os.environ:
+    gazebo_model_path += os.pathsep + os.environ['GAZEBO_MODEL_PATH']
+
+  gazebo_resource_path = resource_path
+  if 'GAZEBO_RESOURCE_PATH' in os.environ:
+    gazebo_resource_path += os.pathsep + os.environ['GAZEBO_RESOURCE_PATH']
+
+  gzserver_cmd = [
+    'gzserver',
+    world_path,
+    '-slibgazebo_ros_init.so',
+    '-slibgazebo_ros_factory.so',
+    '-slibgazebo_ros_force_system.so',
+  ]
+  if verbose_str == 'true':
+    gzserver_cmd.append('--verbose')
+
+  start_gzserver = ExecuteProcess(
+    cmd=gzserver_cmd,
+    output='screen',
+    additional_env={
+      'GAZEBO_MODEL_PATH': gazebo_model_path,
+      'GAZEBO_RESOURCE_PATH': gazebo_resource_path,
+    },
+  )
+
+  actions = [start_gzserver]
+  if gui_str == 'true':
+    actions.append(ExecuteProcess(cmd=['gzclient'], output='screen'))
+
+  return actions
+
 
 def generate_launch_description():
   sensorOffsetX = LaunchConfiguration('sensorOffsetX')
@@ -34,12 +82,9 @@ def generate_launch_description():
   smoothRateIncl = LaunchConfiguration('smoothRateIncl')
   InclFittingThre = LaunchConfiguration('InclFittingThre')
   maxIncl = LaunchConfiguration('maxIncl')
-  pause = LaunchConfiguration('pause')
   use_sim_time = LaunchConfiguration('use_sim_time')
   gui = LaunchConfiguration('gui')
-  record = LaunchConfiguration('record')
   verbose = LaunchConfiguration('verbose')
-  world_name = LaunchConfiguration('world_name')
 
   declare_sensorOffsetX = DeclareLaunchArgument('sensorOffsetX', default_value='0.0', description='')
   declare_sensorOffsetY = DeclareLaunchArgument('sensorOffsetY', default_value='0.0', description='')
@@ -62,15 +107,15 @@ def generate_launch_description():
   declare_smoothRateIncl = DeclareLaunchArgument('smoothRateIncl', default_value='0.5', description='')
   declare_InclFittingThre = DeclareLaunchArgument('InclFittingThre', default_value='0.2', description='')
   declare_maxIncl = DeclareLaunchArgument('maxIncl', default_value='30.0', description='')
-  declare_pause = DeclareLaunchArgument('pause', default_value='false', description='')
   declare_use_sim_time = DeclareLaunchArgument('use_sim_time', default_value='false', description='')
   declare_gui = DeclareLaunchArgument('gui', default_value='false', description='')
-  declare_record = DeclareLaunchArgument('record', default_value='false', description='')
   declare_verbose = DeclareLaunchArgument('verbose', default_value='false', description='')
   declare_world_name = DeclareLaunchArgument('world_name', default_value='garage', description='')
-  
-  lidar_xacro = os.path.join(get_package_share_directory('vehicle_simulator'), 'urdf', 'lidar.urdf.xacro')
-  lidar_description = Command(['xacro',' ', lidar_xacro])
+
+  pkg_share = get_package_share_directory('vehicle_simulator')
+  lidar_xacro = os.path.join(pkg_share, 'urdf', 'lidar.urdf.xacro')
+  lidar_description = Command(['xacro', ' ', lidar_xacro])
+
   start_lidar_state_publisher = Node(
     package='robot_state_publisher',
     executable='robot_state_publisher',
@@ -78,90 +123,76 @@ def generate_launch_description():
     output='screen',
     parameters=[{
       'use_sim_time': use_sim_time,
-      'robot_description': lidar_description
-    }]
+      'robot_description': lidar_description,
+    }],
   )
 
   spawn_lidar = Node(
-    package='gazebo_ros', 
+    package='gazebo_ros',
     executable='spawn_entity.py',
-    arguments=[
-      '-entity', 'lidar',
-      '-topic', 'robot_description',
-    ],
+    arguments=['-entity', 'lidar', '-topic', 'robot_description'],
     output='screen',
   )
 
-  robot_xacro = os.path.join(get_package_share_directory('vehicle_simulator'), 'urdf', 'robot.sdf')
+  robot_sdf = os.path.join(pkg_share, 'urdf', 'robot.sdf')
   spawn_robot = Node(
-    package='gazebo_ros', 
+    package='gazebo_ros',
     executable='spawn_entity.py',
-    arguments=[
-      '-file', robot_xacro,
-      '-entity', 'robot'
-    ],
+    arguments=['-file', robot_sdf, '-entity', 'robot'],
     output='screen',
   )
 
-  camera_xacro = os.path.join(get_package_share_directory('vehicle_simulator'), 'urdf', 'camera.urdf.xacro')
+  camera_xacro = os.path.join(pkg_share, 'urdf', 'camera.urdf.xacro')
   spawn_camera = Node(
-    package='gazebo_ros', 
+    package='gazebo_ros',
     executable='spawn_entity.py',
-    arguments=[
-      '-file', camera_xacro,
-      '-entity', 'camera'
-      ],
-      output='screen'
-  )
-
-  start_gazebo = IncludeLaunchDescription(
-    PythonLaunchDescriptionSource(os.path.join(
-      get_package_share_directory('gazebo_ros'), 'launch', 'gazebo.launch.py'))
+    arguments=['-file', camera_xacro, '-entity', 'camera'],
+    output='screen',
   )
 
   start_vehicle_simulator = Node(
-    package='vehicle_simulator', 
+    package='vehicle_simulator',
     executable='vehicleSimulator',
-    parameters=[
-      {
-        'use_gazebo_time': False,
-        'sensorOffsetX': sensorOffsetX,
-        'sensorOffsetY': sensorOffsetY,
-        'vehicleHeight': vehicleHeight,
-        'cameraOffsetZ': cameraOffsetZ,
-        'vehicleX': vehicleX,
-        'vehicleY': vehicleY,
-        'vehicleZ': vehicleZ,
-        'terrainZ': terrainZ,
-        'vehicleYaw': vehicleYaw,
-        'terrainVoxelSize': terrainVoxelSize,
-        'groundHeightThre': groundHeightThre,
-        'adjustZ': adjustZ,
-        'terrainRadiusZ': terrainRadiusZ,
-        'minTerrainPointNumZ': minTerrainPointNumZ,
-        'smoothRateZ': smoothRateZ,
-        'adjustIncl': adjustIncl,
-        'terrainRadiusIncl': terrainRadiusIncl,
-        'minTerrainPointNumIncl': minTerrainPointNumIncl,
-        'smoothRateIncl': smoothRateIncl,
-        'InclFittingThre': InclFittingThre,
-        'maxIncl': maxIncl,
-        'use_sim_time': use_sim_time
-      }
-      ],
-      output='screen'
+    parameters=[{
+      'use_gazebo_time': False,
+      'sensorOffsetX': sensorOffsetX,
+      'sensorOffsetY': sensorOffsetY,
+      'vehicleHeight': vehicleHeight,
+      'cameraOffsetZ': cameraOffsetZ,
+      'vehicleX': vehicleX,
+      'vehicleY': vehicleY,
+      'vehicleZ': vehicleZ,
+      'terrainZ': terrainZ,
+      'vehicleYaw': vehicleYaw,
+      'terrainVoxelSize': terrainVoxelSize,
+      'groundHeightThre': groundHeightThre,
+      'adjustZ': adjustZ,
+      'terrainRadiusZ': terrainRadiusZ,
+      'minTerrainPointNumZ': minTerrainPointNumZ,
+      'smoothRateZ': smoothRateZ,
+      'adjustIncl': adjustIncl,
+      'terrainRadiusIncl': terrainRadiusIncl,
+      'minTerrainPointNumIncl': minTerrainPointNumIncl,
+      'smoothRateIncl': smoothRateIncl,
+      'InclFittingThre': InclFittingThre,
+      'maxIncl': maxIncl,
+      'use_sim_time': use_sim_time,
+    }],
+    output='screen',
+  )
+
+  delayed_spawn_entities = TimerAction(
+    period=5.0,
+    actions=[spawn_lidar, spawn_robot, spawn_camera],
   )
 
   delayed_start_vehicle_simulator = TimerAction(
-    period=5.0,
-    actions=[
-      start_vehicle_simulator
-    ]
+    period=8.0,
+    actions=[start_vehicle_simulator],
   )
 
   ld = LaunchDescription()
 
-  # Add the actions
   ld.add_action(declare_sensorOffsetX)
   ld.add_action(declare_sensorOffsetY)
   ld.add_action(declare_vehicleHeight)
@@ -183,19 +214,14 @@ def generate_launch_description():
   ld.add_action(declare_smoothRateIncl)
   ld.add_action(declare_InclFittingThre)
   ld.add_action(declare_maxIncl)
-  ld.add_action(declare_pause)
   ld.add_action(declare_use_sim_time)
   ld.add_action(declare_gui)
-  ld.add_action(declare_record)
   ld.add_action(declare_verbose)
   ld.add_action(declare_world_name)
-  ld.add_action(OpaqueFunction(function=declare_world_action, args=[world_name]))
 
-  ld.add_action(start_gazebo)
+  ld.add_action(OpaqueFunction(function=setup_gazebo))
   ld.add_action(start_lidar_state_publisher)
-  ld.add_action(spawn_lidar)
-  ld.add_action(spawn_robot)
-  ld.add_action(spawn_camera)
+  ld.add_action(delayed_spawn_entities)
   ld.add_action(delayed_start_vehicle_simulator)
 
   return ld

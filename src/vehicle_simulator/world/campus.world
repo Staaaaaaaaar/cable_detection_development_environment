@@ -23,8 +23,12 @@
       <background>0.3 0.3 0.3 1</background>
       <shadows>0</shadows>
     </scene>
-    <plugin name="ros_interface_plugin" filename="librotors_gazebo_ros_interface_plugin.so"/>
-    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so"/>
+    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
+      <ros>
+        <namespace>/</namespace>
+      </ros>
+      <update_rate>50.0</update_rate>
+    </plugin>
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>
       <latitude_deg>0</latitude_deg>

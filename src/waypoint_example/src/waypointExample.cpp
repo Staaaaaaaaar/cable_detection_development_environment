@@ -31,7 +31,7 @@ const double PI = 3.1415926;
 
 string waypoint_file_dir;
 string boundary_file_dir;
-double waypointXYRadius = 0.5;
+double waypointXYRadius = 0.08;
 double waypointZBound = 5.0;
 double waitTime = 0;
 double waitTimeStart = 0;
