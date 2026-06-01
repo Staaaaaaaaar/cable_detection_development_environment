@@ -62,9 +62,11 @@
     <param name="pubSkipNum" value="1" />
     <param name="holonomicMode" value="true" />
     <param name="lookAheadDis" value="0.25" />
-    <param name="posGain" value="5.0" />
+    <param name="posGain" value="4.0" />
     <param name="yawGain" value="2.0" />
     <param name="pathYawGain" value="3.0" />
+    <param name="rotateInPlaceOnPath" value="true" />
+    <param name="pathAlignYawThre" value="12.0" />
     <!-- Hardware velocity limits (rad/s for yaw) -->
     <param name="maxVx" value="3.0" />
     <param name="minVx" value="0.05" />

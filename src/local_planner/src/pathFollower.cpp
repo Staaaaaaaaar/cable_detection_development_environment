@@ -34,6 +34,8 @@ double lookAheadDis = 0.3;
 double posGain = 2.0;
 double yawGain = 2.5;
 double pathYawGain = 3.0;
+bool rotateInPlaceOnPath = true;
+double pathAlignYawThre = 12.0;
 double maxVx = 3.0;
 double minVx = 0.05;
 double maxVy = 1.0;
@@ -301,6 +303,7 @@ bool computeHolonomicPathCmd(float speedScale)
 
   float desiredYaw = wrapAngle(vehicleYawRec + pathDir);
   float yawErr = wrapAngle(vehicleYaw - desiredYaw);
+  float yawErrAbs = fabs(yawErr);
 
   float posScale = speedScale;
   if (endDis < slowDwnDisThre) {
@@ -315,6 +318,12 @@ bool computeHolonomicPathCmd(float speedScale)
     yawScale *= endDis / slowDwnDisThre;
   }
   cmdWz = -pathYawGain * yawErr * yawScale;
+
+  // During path tracking, optionally enforce "rotate first, then move".
+  if (rotateInPlaceOnPath && yawErrAbs > pathAlignYawThre * PI / 180.0) {
+    cmdVx = 0;
+    cmdVy = 0;
+  }
 
   clampHolonomicCmd(cmdVx, cmdVy, cmdWz, maxSpeed * speedScale, maxYawRate);
   applyRobotCmdLimits(cmdVx, cmdVy, cmdWz, false);
@@ -334,6 +343,8 @@ int main(int argc, char** argv)
   nh->declare_parameter<double>("posGain", posGain);
   nh->declare_parameter<double>("yawGain", yawGain);
   nh->declare_parameter<double>("pathYawGain", pathYawGain);
+  nh->declare_parameter<bool>("rotateInPlaceOnPath", rotateInPlaceOnPath);
+  nh->declare_parameter<double>("pathAlignYawThre", pathAlignYawThre);
   nh->declare_parameter<double>("maxVx", maxVx);
   nh->declare_parameter<double>("minVx", minVx);
   nh->declare_parameter<double>("maxVy", maxVy);
@@ -369,6 +380,8 @@ int main(int argc, char** argv)
   nh->get_parameter("posGain", posGain);
   nh->get_parameter("yawGain", yawGain);
   nh->get_parameter("pathYawGain", pathYawGain);
+  nh->get_parameter("rotateInPlaceOnPath", rotateInPlaceOnPath);
+  nh->get_parameter("pathAlignYawThre", pathAlignYawThre);
   nh->get_parameter("maxVx", maxVx);
   nh->get_parameter("minVx", minVx);
   nh->get_parameter("maxVy", maxVy);
