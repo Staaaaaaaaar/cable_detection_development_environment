@@ -84,6 +84,7 @@ double joyToCheckObstacleDelay = 5.0;
 double goalClearRange = 0.5;
 double goalX = 0;
 double goalY = 0;
+bool goalValid = false;
 
 float joySpeed = 0;
 float joySpeedRaw = 0;
@@ -248,6 +249,7 @@ void goalPoseHandler(const geometry_msgs::msg::PoseStamped::ConstSharedPtr goal)
 {
   goalX = goal->pose.position.x;
   goalY = goal->pose.position.y;
+  goalValid = true;
 }
 
 void speedHandler(const std_msgs::msg::Float32::ConstSharedPtr speed)
@@ -539,8 +541,6 @@ int main(int argc, char** argv)
   nh->declare_parameter<double>("joyToSpeedDelay", joyToSpeedDelay);
   nh->declare_parameter<double>("joyToCheckObstacleDelay", joyToCheckObstacleDelay);
   nh->declare_parameter<double>("goalClearRange", goalClearRange);
-  nh->declare_parameter<double>("goalX", goalX);
-  nh->declare_parameter<double>("goalY", goalY);
 
   nh->get_parameter("pathFolder", pathFolder);
   nh->get_parameter("vehicleLength", vehicleLength);
@@ -579,8 +579,6 @@ int main(int argc, char** argv)
   nh->get_parameter("joyToSpeedDelay", joyToSpeedDelay);
   nh->get_parameter("joyToCheckObstacleDelay", joyToCheckObstacleDelay);
   nh->get_parameter("goalClearRange", goalClearRange);
-  nh->get_parameter("goalX", goalX);
-  nh->get_parameter("goalY", goalY);
 
   auto subOdometry = nh->create_subscription<nav_msgs::msg::Odometry>("/state_estimation", 5, odometryHandler);
 
@@ -727,6 +725,26 @@ int main(int argc, char** argv)
       if (pathRangeBySpeed) pathRange = adjacentRange * joySpeed;
       if (pathRange < minPathRange) pathRange = minPathRange;
       float relativeGoalDis = adjacentRange;
+
+      if (autonomyMode && !goalValid) {
+        path.poses.resize(1);
+        path.poses[0].pose.position.x = 0;
+        path.poses[0].pose.position.y = 0;
+        path.poses[0].pose.position.z = 0;
+        path.header.stamp = rclcpp::Time(static_cast<uint64_t>(odomTime * 1e9));
+        path.header.frame_id = "vehicle";
+        pubPath->publish(path);
+
+        #if PLOTPATHSET == 1
+        freePaths->clear();
+        sensor_msgs::msg::PointCloud2 freePaths2;
+        pcl::toROSMsg(*freePaths, freePaths2);
+        freePaths2.header.stamp = rclcpp::Time(static_cast<uint64_t>(odomTime * 1e9));
+        freePaths2.header.frame_id = "vehicle";
+        pubFreePaths->publish(freePaths2);
+        #endif
+        continue;
+      }
 
       if (autonomyMode) {
         float relativeGoalX = ((goalX - vehicleX) * cosVehicleYaw + (goalY - vehicleY) * sinVehicleYaw);

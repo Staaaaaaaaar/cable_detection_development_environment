@@ -100,7 +100,7 @@ def generate_launch_description():
   ld.add_action(start_terrain_analysis_ext)
   ld.add_action(start_sensor_scan_generation)
   ld.add_action(start_loam_interface)
-  ld.add_action(start_joy)
+  # ld.add_action(start_joy)
   ld.add_action(delayed_start_rviz)
 
   return ld
