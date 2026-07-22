@@ -36,8 +36,6 @@ def generate_launch_description():
     ),
     launch_arguments={
       'cameraOffsetZ': cameraOffsetZ,
-      'goalX': vehicleX,
-      'goalY': vehicleY,
     }.items()
   )
 
@@ -66,6 +64,7 @@ def generate_launch_description():
       'cameraOffsetZ': cameraOffsetZ,
       'vehicleX': vehicleX,
       'vehicleY': vehicleY,
+      'vehicleZ': vehicleZ,
       'terrainZ': terrainZ,
       'vehicleYaw': vehicleYaw,
       'gui': gazebo_gui,
@@ -76,15 +75,6 @@ def generate_launch_description():
     FrontendLaunchDescriptionSource(os.path.join(
       get_package_share_directory('sensor_scan_generation'), 'launch', 'sensor_scan_generation.launch')
     )
-  )
-
-  start_visualization_tools = IncludeLaunchDescription(
-    FrontendLaunchDescriptionSource(os.path.join(
-      get_package_share_directory('visualization_tools'), 'launch', 'visualization_tools.launch')
-    ),
-    launch_arguments={
-      'world_name': world_name,
-    }.items()
   )
 
   start_joy = Node(
@@ -133,7 +123,6 @@ def generate_launch_description():
   ld.add_action(start_terrain_analysis_ext)
   ld.add_action(start_vehicle_simulator)
   ld.add_action(start_sensor_scan_generation)
-  # ld.add_action(start_visualization_tools)
   ld.add_action(start_joy)
   ld.add_action(delayed_start_rviz)
 

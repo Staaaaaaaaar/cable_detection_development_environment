@@ -10,6 +10,9 @@ log/*
 
 *~
 
+__pycache__/
+*.py[cod]
+
 .DS_Store
 
 src/vehicle_simulator/mesh/*
@@ -22,8 +25,4 @@ src/vehicle_simulator/mesh/matterport/segmentations/*
 
 src/vehicle_simulator/mesh/matterport/preview/*
 
-src/vehicle_simulator/log/*
-
-!download_environments.sh
-
-!readme.txt
+!src/vehicle_simulator/mesh/download_environments.sh

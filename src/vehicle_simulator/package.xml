@@ -11,6 +11,7 @@
   <depend>std_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
   <depend>pcl_ros</depend>
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
@@ -19,6 +20,20 @@
   <depend>pcl_conversions</depend>
   <depend>gazebo_ros</depend>
   <depend>gazebo_msgs</depend>
+
+  <!-- Packages included by the simulation and real-robot system launch files. -->
+  <exec_depend>local_planner</exec_depend>
+  <exec_depend>terrain_analysis</exec_depend>
+  <exec_depend>terrain_analysis_ext</exec_depend>
+  <exec_depend>sensor_scan_generation</exec_depend>
+  <exec_depend>loam_interface</exec_depend>
+  <exec_depend>velodyne_description</exec_depend>
+  <exec_depend>velodyne_gazebo_plugins</exec_depend>
+  <exec_depend>waypoint_rviz_plugin</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>joy</exec_depend>
+  <exec_depend>rviz2</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

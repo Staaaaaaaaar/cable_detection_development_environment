@@ -1,106 +1,99 @@
 import os
 
-from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
+from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import PackageNotFoundError
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription
+from launch.actions import TimerAction
 from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource, FrontendLaunchDescriptionSource
+from launch.launch_description_sources import FrontendLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch.substitutions import LaunchConfiguration 
+
 
 def _get_vehicle_simulator_share():
-  try:
-    return get_package_share_directory('vehicle_simulator')
-  except PackageNotFoundError:
-    # Allow running this launch file directly from source when simulator package is not built.
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    try:
+        return get_package_share_directory('vehicle_simulator')
+    except PackageNotFoundError:
+        # Support launching directly from the source tree before installation.
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _include(package_name, launch_name, launch_arguments=None):
+    return IncludeLaunchDescription(
+        FrontendLaunchDescriptionSource(
+            os.path.join(get_package_share_directory(package_name), 'launch', launch_name)
+        ),
+        launch_arguments=(launch_arguments or {}).items(),
+    )
+
 
 def generate_launch_description():
-  cameraOffsetZ = LaunchConfiguration('cameraOffsetZ')
-  checkTerrainConn = LaunchConfiguration('checkTerrainConn')
-  use_rviz = LaunchConfiguration('use_rviz')
-  
-  declare_cameraOffsetZ = DeclareLaunchArgument('cameraOffsetZ', default_value='0.0', description='')
-  declare_checkTerrainConn = DeclareLaunchArgument('checkTerrainConn', default_value='true', description='')
-  declare_use_rviz = DeclareLaunchArgument('use_rviz', default_value='true', description='')
-  
-  start_local_planner = IncludeLaunchDescription(
-    FrontendLaunchDescriptionSource(os.path.join(
-      get_package_share_directory('local_planner'), 'launch', 'local_planner.launch')
-    ),
-    launch_arguments={
-      'cameraOffsetZ': cameraOffsetZ,
-    }.items()
-  )
+    camera_offset_z = LaunchConfiguration('cameraOffsetZ')
+    check_terrain_connection = LaunchConfiguration('checkTerrainConn')
+    use_rviz = LaunchConfiguration('use_rviz')
+    max_speed = LaunchConfiguration('maxSpeed')
+    autonomy_speed = LaunchConfiguration('autonomySpeed')
+    goal_position_threshold = LaunchConfiguration('goalPosThre')
+    goal_yaw_threshold = LaunchConfiguration('goalYawThre')
 
-  start_terrain_analysis = IncludeLaunchDescription(
-    FrontendLaunchDescriptionSource(os.path.join(
-      get_package_share_directory('terrain_analysis'), 'launch', 'terrain_analysis.launch')
-    )
-  )
-
-  start_terrain_analysis_ext = IncludeLaunchDescription(
-    FrontendLaunchDescriptionSource(os.path.join(
-      get_package_share_directory('terrain_analysis_ext'), 'launch', 'terrain_analysis_ext.launch')
-    ),
-    launch_arguments={
-      'checkTerrainConn': checkTerrainConn,
-    }.items()
-  )
-
-  start_sensor_scan_generation = IncludeLaunchDescription(
-    FrontendLaunchDescriptionSource(os.path.join(
-      get_package_share_directory('sensor_scan_generation'), 'launch', 'sensor_scan_generation.launch')
-    )
-  )
-
-  start_loam_interface = IncludeLaunchDescription(
-    FrontendLaunchDescriptionSource(os.path.join(
-      get_package_share_directory('loam_interface'), 'launch', 'loam_interface.launch')
-    )
-  )
-
-  start_joy = Node(
-    package='joy', 
-    executable='joy_node',
-    name='ps3_joy',
-    output='screen',
-    parameters=[{
-                'dev': "/dev/input/js0",
-                'deadzone': 0.12,
-                'autorepeat_rate': 0.0,
-  		}]
-  )
-
-  rviz_config_file = os.path.join(_get_vehicle_simulator_share(), 'rviz', 'vehicle_simulator.rviz')
-  start_rviz = Node(
-    package='rviz2',
-    executable='rviz2',
-    arguments=['-d', rviz_config_file],
-    output='screen',
-    condition=IfCondition(use_rviz)
-  )
-
-  delayed_start_rviz = TimerAction(
-    period=8.0,
-    actions=[
-      start_rviz
+    declarations = [
+        DeclareLaunchArgument('cameraOffsetZ', default_value='0.0'),
+        DeclareLaunchArgument('checkTerrainConn', default_value='true'),
+        DeclareLaunchArgument('use_rviz', default_value='true'),
+        DeclareLaunchArgument('maxSpeed', default_value='1.0'),
+        DeclareLaunchArgument('autonomySpeed', default_value='1.0'),
+        DeclareLaunchArgument('goalPosThre', default_value='0.20'),
+        DeclareLaunchArgument('goalYawThre', default_value='10.0'),
     ]
-  )
 
-  ld = LaunchDescription()
+    local_planner = _include(
+        'local_planner',
+        'local_planner.launch',
+        {
+            'cameraOffsetZ': camera_offset_z,
+            'maxSpeed': max_speed,
+            'autonomySpeed': autonomy_speed,
+            'goalPosThre': goal_position_threshold,
+            'goalYawThre': goal_yaw_threshold,
+        },
+    )
+    terrain_analysis = _include('terrain_analysis', 'terrain_analysis.launch')
+    terrain_analysis_ext = _include(
+        'terrain_analysis_ext',
+        'terrain_analysis_ext.launch',
+        {'checkTerrainConn': check_terrain_connection},
+    )
+    sensor_scan_generation = _include(
+        'sensor_scan_generation', 'sensor_scan_generation.launch'
+    )
+    loam_interface = _include('loam_interface', 'loam_interface.launch')
 
-  # Add the actions
-  ld.add_action(declare_cameraOffsetZ)
-  ld.add_action(declare_checkTerrainConn)
-  ld.add_action(declare_use_rviz)
+    rviz_config = os.path.join(
+        _get_vehicle_simulator_share(), 'rviz', 'vehicle_simulator.rviz'
+    )
+    delayed_rviz = TimerAction(
+        period=8.0,
+        actions=[
+            Node(
+                package='rviz2',
+                executable='rviz2',
+                arguments=['-d', rviz_config],
+                output='screen',
+                condition=IfCondition(use_rviz),
+            )
+        ],
+    )
 
-  ld.add_action(start_local_planner)
-  ld.add_action(start_terrain_analysis)
-  ld.add_action(start_terrain_analysis_ext)
-  ld.add_action(start_sensor_scan_generation)
-  ld.add_action(start_loam_interface)
-  # ld.add_action(start_joy)
-  ld.add_action(delayed_start_rviz)
-
-  return ld
+    return LaunchDescription(
+        declarations
+        + [
+            local_planner,
+            terrain_analysis,
+            terrain_analysis_ext,
+            sensor_scan_generation,
+            loam_interface,
+            delayed_rviz,
+        ]
+    )

@@ -8,7 +8,6 @@ cd "${ROOT_DIR}"
 SIM_PACKAGES=(
   vehicle_simulator
   velodyne_gazebo_plugins
-  velodyne_simulator
   velodyne_description
 )
 
